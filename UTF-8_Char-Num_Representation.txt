@@ -1,3 +1,5 @@
+This file contains the translation of certain UTF character that we used in our characterCreator.py file.
+
 33-47= !"#$%&'()*+,-./
 48-57 = 0-9
 58-64 = :;<=>?@
