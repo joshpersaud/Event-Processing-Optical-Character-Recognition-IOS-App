@@ -25,18 +25,18 @@ private:
     
     
     size_t numOutputs;
-    arma::vec output;
+    vec output;
     
-    arma::mat weights;
-    arma::vec biases;
+    mat weights;
+    vec biases;
     
-    arma::cube grad_i;
-    arma::mat grad_w;
-    arma::vec grad_b;
+    cube grad_i;
+    mat grad_w;
+    vec grad_b;
     
-    arma::cube accum_grad_i;
-    arma::mat accum_grad_w;
-    arma::vec accum_grad_b;
+    cube accum_grad_i;
+    mat accum_grad_w;
+    vec accum_grad_b;
     
     double assign_rand_weights(double mean, double variance)
     {
