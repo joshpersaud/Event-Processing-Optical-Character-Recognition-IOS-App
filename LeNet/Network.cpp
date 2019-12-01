@@ -18,8 +18,8 @@ void Network:: forward_pass(cube& input, vec& output)
 }
 void Network:: backward_pass(vec& gradient)
 {
-    vec grad_i_vec = zeros(i_H* i_W * i_D);
-    for ( int i = 0; i < (i_H* i_W * i_D); i++)
+    vec grad_i_vec = zeros(i_H * i_W * i_D);
+    for ( size_t i = 0; i < (i_H* i_W * i_D); i++)
         grad_i_vec[i] = dot(weights.col(i),gradient);
     
     cube tmp((i_H* i_W * i_D),1,1);
@@ -27,6 +27,12 @@ void Network:: backward_pass(vec& gradient)
     
     grad_i = reshape(tmp, i_H, i_W, i_D);
     
+    accum_grad_i += grad_i;
+    
+    grad_w = zeros(size(weights));
+    for(size_t i = 0; i< grad_w.n_rows;i++)
+        grad_w.row(i) = vectorise(input).t() * gradient[i];
+
     accum_grad_w += grad_w;
     
     grad_b = gradient;

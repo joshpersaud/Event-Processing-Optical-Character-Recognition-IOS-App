@@ -12,30 +12,9 @@
 #include "Network.hpp"
 #include "ReLU.hpp"
 #include "Soft_Max.hpp"
+#include "Cross_Entropy_Loss_Layer.hpp"
 
-#define I_H_c1 28
-#define I_W_c1 28
-#define I_D_c1 1
-
-#define I_H_c2 12
-#define I_W_c2 12
-#define I_D_c2 6
-
-#define F_H 5
-#define F_W 5
-#define STRIDE_H 1
-#define STRIDE_V 1
-#define NUM_FILT_f1 6
-#define NUM_FILT_f2 16
-
-#define P_H 2
-#define P_W 2
-#define P_H_STRIDE 2
-#define P_V_STRIDE 2
-
-#define LEARNING_RATE .05
-#define EPOCHS 10
-#define BATCH_SIZE 10
+#include <fstream>
 
 
 class MC_LeNet
@@ -44,12 +23,36 @@ private:
     vector<cube> training_set;
     vector<vec> training_labels;
     
+    vector<cube> convolution1_filters;
+    vector<cube> convolution2_filters;
+    mat network_weights;
+    vec network_biases;
+    
+    
     size_t t_set_len;
     size_t t_label_len;
+    
+    
+    size_t input_height;
+    size_t input_width;
+    size_t input_depth;
+    size_t filter_height;
+    size_t filter_width;
+    size_t num_filters;
+    size_t filter_vertical_stride;
+    size_t filter_horizontal_stride;
+    size_t pooling_height;
+    size_t pooling_width;
+    size_t pooling_vertical_stride;
+    size_t pooling_horizontal_stride;
+    size_t num_classes;
+    size_t batch_size;
+    size_t epochs;
     size_t num_batches;
+    double learning_rate;
     
     double cum_loss;
-    double accuracy;
+    double loss;
     
     Convolution *c1;
     cube c1_out;
@@ -74,105 +77,137 @@ private:
     
     Soft_Max *s1;
     vec s1_out;
+    
+    Cross_Entropy_Loss_Layer *e1;
 
     
-    double cross_entropy_loss;
-    vec grad_wrt_real_output;
-    
-    double calculate_cross_entropy_loss(vec real_Label, vec training_Label);
-    double calculate_grad_wrt_output(vec real_Label, vec training_Label);
+    void write_training_results_to_file(string file_path);
     
 public:
     
-    MC_LeNet(vector<cube> training_set,vector<vec> training_labels)
+    MC_LeNet(vector<cube> training_set,vector<vec> training_labels,size_t input_height
+                                                                    ,size_t input_width
+                                                                    ,size_t input_depth
+                                                                    ,size_t filter_height
+                                                                    ,size_t filter_width
+                                                                    ,size_t num_filters
+                                                                    ,size_t filter_vertical_stride
+                                                                    ,size_t filter_horizontal_stride
+                                                                    ,size_t pooling_height
+                                                                    ,size_t pooling_width
+                                                                    ,size_t pooling_vertical_stride
+                                                                    ,size_t pooling_horizontal_stride
+                                                                    ,size_t num_classes
+                                                                    ,size_t batch_size
+                                                                    ,size_t epochs
+                                                                    ,double learning_rate)
     {
         this->training_set = training_set;
-        t_set_len = training_set.size();
-        
         this->training_labels = training_labels;
+        
+        this->input_height = input_height;
+        this->input_width = input_width;
+        this->input_depth = input_depth;
+        this->filter_height = filter_height;
+        this->filter_width = filter_width;
+        this->num_filters = num_filters;
+        this->filter_vertical_stride = filter_vertical_stride;
+        this->filter_horizontal_stride = filter_horizontal_stride;
+        this->pooling_height = pooling_height;
+        this->pooling_width = pooling_width;
+        this->pooling_vertical_stride = pooling_vertical_stride;
+        this->pooling_horizontal_stride = pooling_horizontal_stride;
+        this->num_classes = num_classes;
+        this->batch_size = batch_size;
+        this->epochs = epochs;
+        this->learning_rate = learning_rate;
+        
+        this->loss = 0.0;
+        this->cum_loss = 0.0;
+        
+        t_set_len = training_set.size();
         t_label_len = training_labels.size();
         
-        this->num_batches = t_set_len/BATCH_SIZE;
+        num_batches = t_set_len/batch_size;
         
-        cross_entropy_loss = 0.0;
-        grad_wrt_real_output = 0.0;
+        c1 = new Convolution(input_height
+                             ,input_width
+                             ,input_depth
+                             ,filter_height
+                             ,filter_width
+                             ,filter_vertical_stride
+                             ,filter_horizontal_stride
+                             ,num_filters);
         
-        c1 = new Convolution(I_H_c1
-                             ,I_W_c1
-                             ,I_D_c1
-                             ,F_H
-                             ,F_W
-                             ,STRIDE_V
-                             ,STRIDE_H
-                             ,NUM_FILT_f1);
+        c1_out = zeros((input_height - filter_height)/filter_vertical_stride + 1
+                       ,(input_width - filter_width)/filter_horizontal_stride + 1
+                       ,num_filters);
         
-        c1_out = zeros(I_H_c1 - (F_H - 1)
-                       ,I_H_c1 - (F_W - 1)
-                       ,NUM_FILT_f1);
+        r1 = new ReLU(c1_out.n_rows
+                      ,c1_out.n_cols
+                      ,num_filters);
         
-        r1 = new ReLU(I_H_c1 - (F_H - 1)
-                      ,I_H_c1 - (F_W - 1)
-                      ,NUM_FILT_f1);
+        r1_out = zeros(c1_out.n_rows
+                       ,c1_out.n_cols
+                       ,num_filters);
         
-        r1_out = zeros(I_H_c1 - (F_H - 1)
-                       ,I_H_c1 - (F_W - 1)
-                       ,NUM_FILT_f1);
+        p1 = new Max_Pool(c1_out.n_rows
+                          ,c1_out.n_cols
+                          ,num_filters
+                          ,pooling_height
+                          ,pooling_width
+                          ,pooling_vertical_stride
+                          ,pooling_horizontal_stride);
         
-        p1 = new Max_Pool(I_H_c1 - (F_H - 1)
-                          ,I_H_c1 - (F_W - 1)
-                          ,NUM_FILT_f1
-                          ,P_H
-                          ,P_W
-                          ,P_V_STRIDE
-                          ,P_H_STRIDE);
+        p1_out = zeros((c1_out.n_rows - pooling_height)/pooling_vertical_stride + 1
+                       ,(c1_out.n_cols - pooling_width)/pooling_horizontal_stride + 1
+                       ,num_filters);
         
-        p1_out = zeros(I_H_c2
-                       ,I_W_c2
-                       ,I_D_c2);
+        c2 = new Convolution(p1_out.n_rows
+                             ,p1_out.n_cols
+                             ,num_filters
+                             ,filter_height
+                             ,filter_width
+                             ,filter_vertical_stride
+                             ,filter_horizontal_stride
+                             ,num_filters + 10);
         
-        c2 = new Convolution(I_H_c2
-                             ,I_W_c2
-                             ,I_D_c2
-                             ,F_H
-                             ,F_W
-                             ,STRIDE_V
-                             ,STRIDE_H
-                             ,NUM_FILT_f2);
+        c2_out = zeros((p1_out.n_rows - filter_height)/filter_vertical_stride + 1
+                       ,(p1_out.n_cols - filter_width)/filter_horizontal_stride + 1
+                       ,num_filters + 10);
+        r2 = new ReLU(c2_out.n_rows
+                      ,c2_out.n_cols
+                      ,c2_out.n_slices);
         
-        c2_out = zeros(I_H_c2 - (F_H - 1)
-                       ,I_H_c2 - (F_W - 1)
-                       ,NUM_FILT_f2);
+        r2_out = zeros(c2_out.n_rows
+                       ,c2_out.n_cols
+                       ,c2_out.n_slices);
         
-        r2 = new ReLU(I_H_c2 - (F_H - 1)
-                      ,I_H_c2 - (F_W - 1)
-                      ,NUM_FILT_f2);
+        p2 = new Max_Pool(r2_out.n_rows
+                        ,r2_out.n_cols
+                        ,r2_out.n_slices
+                        ,pooling_height
+                        ,pooling_width
+                        ,pooling_vertical_stride
+                        ,pooling_horizontal_stride);
         
-        r2_out = zeros(I_H_c2 - (F_H - 1)
-                      ,I_H_c2 - (F_W - 1)
-                      ,NUM_FILT_f2);
+        p2_out = zeros((r2_out.n_rows - pooling_height)/pooling_vertical_stride + 1
+                       ,(r2_out.n_cols - pooling_width)/pooling_horizontal_stride + 1
+                       ,c2_out.n_slices);
         
-        p2 = new Max_Pool(I_H_c2 - (F_H - 1)
-                          ,I_H_c2 - (F_W - 1)
-                          ,NUM_FILT_f2
-                          ,P_H
-                          ,P_W
-                          ,P_V_STRIDE
-                          ,P_H_STRIDE);
+        n1 = new Network(p2_out.n_rows
+                         ,p2_out.n_cols
+                         ,p2_out.n_slices
+                         ,num_classes);
         
-        p2_out = zeros((I_H_c2 - (F_H - 1)) / 2
-                       ,(I_H_c2 - (F_W - 1)) / 2
-                       ,NUM_FILT_f2);
+        n1_out = zeros(num_classes);
         
-        n1 = new Network((I_H_c2 - (F_H - 1)) / 2
-                         ,(I_H_c2 - (F_W - 1)) / 2
-                         ,NUM_FILT_f2
-                         ,t_label_len);
+        s1 = new Soft_Max(num_classes);
         
-        n1_out = zeros(t_label_len);
+        s1_out = zeros(num_classes);
         
-        s1 = new Soft_Max(t_label_len);
+        e1 = new Cross_Entropy_Loss_Layer(num_classes);
         
-        s1_out = zeros(t_label_len);
         
     }
     
@@ -186,10 +221,12 @@ public:
         delete p2;
         delete n1;
         delete s1;
+        delete e1;
     }
     
     void train();
-    void predict(cube img);
-    
+    vec predict(cube img);
     
 };
+
+

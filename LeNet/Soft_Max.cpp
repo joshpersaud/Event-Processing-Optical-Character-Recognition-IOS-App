@@ -10,8 +10,9 @@
 
 void Soft_Max:: forward_pass(vec& input,vec& output)
 {
-    double sumExp = accu(exp(input - max(input)));
-    output = exp(input - max(input))/sumExp;
+    
+    double sumExp = arma::accu(arma::exp(input - arma::max(input)));
+    output = arma::exp(input - arma::max(input))/sumExp;
     
     this->input = input;
     this->output = output;
@@ -26,3 +27,4 @@ vec Soft_Max:: get_grad_wrt_i()
 {
     return grad_wrt_i;
 }
+

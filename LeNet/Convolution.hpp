@@ -64,8 +64,6 @@ private:
         return rand;
     }
     
-    
-    
     void reset_accum_grad()
     {
         /*
@@ -75,15 +73,15 @@ private:
          
          */
         
-        accum_grad_i = zeros(i_H,i_W,i_D);
-        
         accum_grad_f.clear();
         accum_grad_f.resize(num_filters);
         
-        for ( int i = 0; i < num_filters; i++)
+        for (size_t i = 0; i < num_filters; i++)
         {
             accum_grad_f[i] = zeros(f_H,f_W,i_D);
         }
+
+        accum_grad_i = zeros(i_H,i_W,i_D);
     }
     
 public:
@@ -112,11 +110,13 @@ public:
         assert((i_W - f_W) % f_h_stride == 0);
         
         this->filters.resize(num_filters);
-        for ( auto& filt : filters)
+        for (size_t i = 0; i < num_filters; i++)
         {
-            filt = zeros(f_H,f_W,i_D);
-            filt.imbue( [&](){return assign_rand_filt(0.0, 1.0);} );
+            this->filters[i] = zeros(f_H,f_W,i_D);
+            this->filters[i].imbue( [&](){return assign_rand_filt(0.0, 1.0);});
         }
+        
+        reset_accum_grad();
         
     }
     
@@ -128,4 +128,5 @@ public:
     vector<cube> get_grad_wrt_f();
     
 };
+
 

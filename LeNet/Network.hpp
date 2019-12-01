@@ -47,19 +47,11 @@ private:
          
          */
         double std_dev = sqrt(variance);
-        
-        random_device rand_dev;
-        mt19937 gen(rand_dev());
-        normal_distribution<> dist(mean,std_dev);
-        
-        double rand = (3*std_dev);
-        
-        while((rand - mean) > (2.0 * std_dev))
-        {
-            rand = dist(gen);
-        }
-        
-        return rand;
+        mat candidate = {3.0 * std_dev};
+    
+        while (std::abs(candidate[0] - mean) > 2.0 * std_dev)
+          candidate.randn(1, 1);
+        return candidate[0];
     }
     
     void reset_accum_grad()
@@ -90,7 +82,7 @@ public:
         this->numOutputs = numOutputs;
         
         weights = zeros(numOutputs,(i_H * i_W * i_D));
-        weights.imbue( [&](){return weights(0.0,1.0);} );
+        weights.imbue( [&](){return assign_rand_weights(0.0,1.0);} );
         biases = zeros(numOutputs);
         
         reset_accum_grad();

@@ -10,7 +10,7 @@
 void ReLU:: forward_pass(cube& input, cube& output)
 {
     output = zeros(i_H,i_W,i_D);
-    output = max(input,output);
+    output = arma::max(input,output);
     
     this->input = input;
     this->output = output;
